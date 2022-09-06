@@ -33,6 +33,7 @@
 package org.opensearch.tasks;
 
 import org.opensearch.LegacyESVersion;
+import org.opensearch.Version;
 import org.opensearch.common.ParseField;
 import org.opensearch.common.Strings;
 import org.opensearch.common.bytes.BytesReference;
@@ -84,6 +85,8 @@ public final class TaskInfo implements Writeable, ToXContentFragment {
 
     private final Map<String, String> headers;
 
+    private final TaskResourceStats resourceStats;
+
     public TaskInfo(
         TaskId taskId,
         String type,
@@ -94,7 +97,8 @@ public final class TaskInfo implements Writeable, ToXContentFragment {
         long runningTimeNanos,
         boolean cancellable,
         TaskId parentTaskId,
-        Map<String, String> headers
+        Map<String, String> headers,
+        TaskResourceStats resourceStats
     ) {
         this.taskId = taskId;
         this.type = type;
@@ -106,11 +110,13 @@ public final class TaskInfo implements Writeable, ToXContentFragment {
         this.cancellable = cancellable;
         this.parentTaskId = parentTaskId;
         this.headers = headers;
+        this.resourceStats = resourceStats;
     }
 
     /**
      * Read from a stream.
      */
+    @SuppressWarnings("unchecked")
     public TaskInfo(StreamInput in) throws IOException {
         taskId = TaskId.readFromStream(in);
         type = in.readString();
@@ -125,6 +131,11 @@ public final class TaskInfo implements Writeable, ToXContentFragment {
             headers = in.readMap(StreamInput::readString, StreamInput::readString);
         } else {
             headers = Collections.emptyMap();
+        }
+        if (in.getVersion().onOrAfter(Version.CURRENT)) {           // TODO: Check with Sruti on the version
+            resourceStats = in.readOptionalWriteable(TaskResourceStats::new);
+        } else {
+            resourceStats = null;
         }
     }
 
@@ -141,6 +152,9 @@ public final class TaskInfo implements Writeable, ToXContentFragment {
         parentTaskId.writeTo(out);
         if (out.getVersion().onOrAfter(LegacyESVersion.V_6_2_0)) {
             out.writeMap(headers, StreamOutput::writeString, StreamOutput::writeString);
+        }
+        if (out.getVersion().onOrAfter(Version.CURRENT)) {           // TODO: Check with Sruti on the version
+            out.writeOptionalWriteable(resourceStats);
         }
     }
 
@@ -207,6 +221,13 @@ public final class TaskInfo implements Writeable, ToXContentFragment {
         return headers;
     }
 
+    /**
+     * Returns the task resource information
+     */
+    public TaskResourceStats getResourceStats() {
+        return resourceStats;
+    }
+
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.field("node", taskId.getNodeId());
@@ -233,6 +254,11 @@ public final class TaskInfo implements Writeable, ToXContentFragment {
             builder.field(attribute.getKey(), attribute.getValue());
         }
         builder.endObject();
+        if (resourceStats != null) {
+            builder.startObject("resource_stats");
+            resourceStats.toXContent(builder, params);
+            builder.endObject();
+        }
         return builder;
     }
 
@@ -257,9 +283,23 @@ public final class TaskInfo implements Writeable, ToXContentFragment {
             // This might happen if we are reading an old version of task info
             headers = Collections.emptyMap();
         }
+        @SuppressWarnings("unchecked")
+        TaskResourceStats resourceStats = (TaskResourceStats) a[i++];
         RawTaskStatus status = statusBytes == null ? null : new RawTaskStatus(statusBytes);
         TaskId parentTaskId = parentTaskIdString == null ? TaskId.EMPTY_TASK_ID : new TaskId(parentTaskIdString);
-        return new TaskInfo(id, type, action, description, status, startTime, runningTimeNanos, cancellable, parentTaskId, headers);
+        return new TaskInfo(
+            id,
+            type,
+            action,
+            description,
+            status,
+            startTime,
+            runningTimeNanos,
+            cancellable,
+            parentTaskId,
+            headers,
+            resourceStats
+        );
     });
     static {
         // Note for the future: this has to be backwards and forwards compatible with all changes to the task storage format
@@ -275,6 +315,7 @@ public final class TaskInfo implements Writeable, ToXContentFragment {
         PARSER.declareBoolean(constructorArg(), new ParseField("cancellable"));
         PARSER.declareString(optionalConstructorArg(), new ParseField("parent_task_id"));
         PARSER.declareObject(optionalConstructorArg(), (p, c) -> p.mapStrings(), new ParseField("headers"));
+        PARSER.declareObject(optionalConstructorArg(), (p, c) -> TaskResourceStats.fromXContent(p), new ParseField("resource_stats"));
     }
 
     @Override
@@ -298,11 +339,24 @@ public final class TaskInfo implements Writeable, ToXContentFragment {
             && Objects.equals(parentTaskId, other.parentTaskId)
             && Objects.equals(cancellable, other.cancellable)
             && Objects.equals(status, other.status)
-            && Objects.equals(headers, other.headers);
+            && Objects.equals(headers, other.headers)
+            && Objects.equals(resourceStats, other.resourceStats);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(taskId, type, action, description, startTime, runningTimeNanos, parentTaskId, cancellable, status, headers);
+        return Objects.hash(
+            taskId,
+            type,
+            action,
+            description,
+            startTime,
+            runningTimeNanos,
+            parentTaskId,
+            cancellable,
+            status,
+            headers,
+            resourceStats
+        );
     }
 }

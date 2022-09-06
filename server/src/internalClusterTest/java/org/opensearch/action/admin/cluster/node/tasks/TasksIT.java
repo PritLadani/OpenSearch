@@ -478,6 +478,9 @@ public class TasksIT extends OpenSearchIntegTestCase {
 
                     @Override
                     public void waitForTaskCompletion(Task task) {}
+
+                    @Override
+                    public void taskExecutionStarted(Task task, Boolean closeableInvoked) {}
                 });
             }
             // Need to run the task in a separate thread because node client's .execute() is blocked by our task listener
@@ -658,6 +661,9 @@ public class TasksIT extends OpenSearchIntegTestCase {
                     public void waitForTaskCompletion(Task task) {
                         waitForWaitingToStart.countDown();
                     }
+
+                    @Override
+                    public void taskExecutionStarted(Task task, Boolean closeableInvoked) {}
 
                     @Override
                     public void onTaskRegistered(Task task) {}
@@ -901,7 +907,19 @@ public class TasksIT extends OpenSearchIntegTestCase {
         TaskResultsService resultsService = internalCluster().getInstance(TaskResultsService.class);
         resultsService.storeResult(
             new TaskResult(
-                new TaskInfo(new TaskId("fake", 1), "test", "test", "", null, 0, 0, false, TaskId.EMPTY_TASK_ID, Collections.emptyMap()),
+                new TaskInfo(
+                    new TaskId("fake", 1),
+                    "test",
+                    "test",
+                    "",
+                    null,
+                    0,
+                    0,
+                    false,
+                    TaskId.EMPTY_TASK_ID,
+                    Collections.emptyMap(),
+                    null
+                ),
                 new RuntimeException("test")
             ),
             new ActionListener<Void>() {

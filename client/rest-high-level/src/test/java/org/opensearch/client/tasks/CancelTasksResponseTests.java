@@ -93,7 +93,8 @@ public class CancelTasksResponseTests extends AbstractResponseTestCase<
                     randomIntBetween(5, 10),
                     false,
                     new TaskId("node1", randomLong()),
-                    Collections.singletonMap("x-header-of", "some-value")
+                    Collections.singletonMap("x-header-of", "some-value"),
+                    null
                 )
             );
         }
