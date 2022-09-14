@@ -132,7 +132,7 @@ public final class TaskInfo implements Writeable, ToXContentFragment {
         } else {
             headers = Collections.emptyMap();
         }
-        if (in.getVersion().onOrAfter(Version.CURRENT)) {           // TODO: Check with Sruti on the version
+        if (in.getVersion().onOrAfter(Version.V_1_3_5)) {
             resourceStats = in.readOptionalWriteable(TaskResourceStats::new);
         } else {
             resourceStats = null;
@@ -153,7 +153,7 @@ public final class TaskInfo implements Writeable, ToXContentFragment {
         if (out.getVersion().onOrAfter(LegacyESVersion.V_6_2_0)) {
             out.writeMap(headers, StreamOutput::writeString, StreamOutput::writeString);
         }
-        if (out.getVersion().onOrAfter(Version.CURRENT)) {           // TODO: Check with Sruti on the version
+        if (out.getVersion().onOrAfter(Version.V_1_3_5)) {
             out.writeOptionalWriteable(resourceStats);
         }
     }
